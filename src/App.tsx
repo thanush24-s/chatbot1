@@ -24,13 +24,44 @@ interface Message {
   timestamp?: Date;
   reactions?: string[];
   isTyping?: boolean;
+  messageType?: 'text' | 'image' | 'file' | 'code';
+  aiPersonality?: string;
+  mood?: 'happy' | 'sad' | 'excited' | 'serious' | 'funny';
 }
 
 interface Toast {
   id: number;
   message: string;
-  type: 'success' | 'error' | 'info';
+  type: 'success' | 'error' | 'info' | 'warning';
 }
+
+interface ChatRoom {
+  id: string;
+  name: string;
+  description: string;
+  participants: number;
+  isActive: boolean;
+}
+
+const AI_PERSONALITIES = [
+  { id: 'assistant', name: '🤖 Assistant', description: 'Helpful and professional' },
+  { id: 'creative', name: '🎨 Creative', description: 'Artistic and imaginative' },
+  { id: 'technical', name: '⚡ Technical', description: 'Expert in coding and tech' },
+  { id: 'philosopher', name: '🧠 Philosopher', description: 'Deep and thoughtful' },
+  { id: 'comedian', name: '😄 Comedian', description: 'Funny and entertaining' },
+  { id: 'teacher', name: '📚 Teacher', description: 'Educational and patient' }
+];
+
+const MESSAGE_TEMPLATES = [
+  "Explain this concept to me",
+  "Write a code example for",
+  "What's the latest trend in",
+  "Help me brainstorm ideas for",
+  "Create a step-by-step guide for",
+  "What are the pros and cons of"
+];
+
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🤔', '✨'];
 
 function App() {
   // State to store all messages
@@ -45,24 +76,21 @@ function App() {
   // Counter for unique message IDs
   const [messageCounter, setMessageCounter] = useState<number>(1);
 
-  // Theme state
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
-
-  // Connection status
+  // Theme and UI states
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [currentTheme, setCurrentTheme] = useState<'cyber' | 'neon' | 'matrix' | 'hologram'>('cyber');
   const [isConnected, setIsConnected] = useState<boolean>(true);
-
-  // Error state
   const [error, setError] = useState<string>('');
 
   // Toast notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [toastCounter, setToastCounter] = useState<number>(1);
 
-  // New attractive features
+  // Advanced features
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showSearch, setShowSearch] = useState<boolean>(false);
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [showSidebar, setShowSidebar] = useState<boolean>(false);
   const [showParticles, setShowParticles] = useState<boolean>(true);
   const [messageFilter, setMessageFilter] = useState<'all' | 'user' | 'ai'>('all');
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -70,12 +98,31 @@ function App() {
   const [showTypingSimulation, setShowTypingSimulation] = useState<boolean>(true);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
 
+  // New revolutionary features
+  const [selectedPersonality, setSelectedPersonality] = useState<string>('assistant');
+  const [showTemplates, setShowTemplates] = useState<boolean>(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([
+    { id: 'general', name: 'General Chat', description: 'Main discussion room', participants: 42, isActive: true },
+    { id: 'tech', name: 'Tech Talk', description: 'Technology discussions', participants: 28, isActive: false },
+    { id: 'creative', name: 'Creative Corner', description: 'Art and creativity', participants: 15, isActive: false }
+  ]);
+  const [activeChatRoom, setActiveChatRoom] = useState<string>('general');
+  const [showChatRooms, setShowChatRooms] = useState<boolean>(false);
+  const [userMood, setUserMood] = useState<string>('😊');
+  const [showAIStatus, setShowAIStatus] = useState<boolean>(true);
+  const [messageCount, setMessageCount] = useState<number>(0);
+  const [typingSpeed, setTypingSpeed] = useState<number>(50);
+  const [showMessagePreview, setShowMessagePreview] = useState<boolean>(false);
+  const [draggedFile, setDraggedFile] = useState<File | null>(null);
+
   // Voice recognition
   const [recognition, setRecognition] = useState<any>(null);
 
   // Reference for auto-scrolling to bottom
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize voice recognition
   useEffect(() => {
@@ -90,6 +137,7 @@ function App() {
         const transcript = event.results[0][0].transcript;
         setInput(transcript);
         setIsRecording(false);
+        showToast('Voice input captured! 🎤', 'success');
       };
 
       recognitionInstance.onerror = () => {
@@ -126,8 +174,8 @@ function App() {
     const savedTheme = localStorage.getItem('chatbot-theme');
     const savedSettings = localStorage.getItem('chatbot-settings');
     
-    if (savedTheme === 'dark') {
-      setIsDarkMode(true);
+    if (savedTheme) {
+      setCurrentTheme(savedTheme as any);
     }
     
     if (savedSettings) {
@@ -136,14 +184,15 @@ function App() {
       setAutoScroll(settings.autoScroll ?? true);
       setShowTypingSimulation(settings.showTypingSimulation ?? true);
       setSoundEnabled(settings.soundEnabled ?? true);
+      setTypingSpeed(settings.typingSpeed ?? 50);
     }
   }, []);
 
   // Apply theme to body
   useEffect(() => {
-    document.body.className = isDarkMode ? 'dark-theme' : 'light-theme';
-    localStorage.setItem('chatbot-theme', isDarkMode ? 'dark' : 'light');
-  }, [isDarkMode]);
+    document.body.className = `theme-${currentTheme}`;
+    localStorage.setItem('chatbot-theme', currentTheme);
+  }, [currentTheme]);
 
   // Save settings
   useEffect(() => {
@@ -151,14 +200,15 @@ function App() {
       showParticles,
       autoScroll,
       showTypingSimulation,
-      soundEnabled
+      soundEnabled,
+      typingSpeed
     };
     localStorage.setItem('chatbot-settings', JSON.stringify(settings));
-  }, [showParticles, autoScroll, showTypingSimulation, soundEnabled]);
+  }, [showParticles, autoScroll, showTypingSimulation, soundEnabled, typingSpeed]);
 
   // Function to load chat history from Firebase
   const loadChatHistory = () => {
-    const messagesRef = collection(db, 'chats', 'default-chat', 'messages');
+    const messagesRef = collection(db, 'chats', activeChatRoom, 'messages');
     const q = query(messagesRef, orderBy('timestamp', 'asc'));
     
     const unsubscribe = onSnapshot(
@@ -171,9 +221,11 @@ function App() {
         if (snapshot.empty) {
           loadedMessages.push({
             id: counter++,
-            text: "👋 Hello! I'm your AI assistant powered by Gemini Pro. I'm here to help you with anything you need! ✨",
+            text: `🚀 Welcome to the ${activeChatRoom.toUpperCase()} chat room! I'm your AI companion with multiple personalities. How can I assist you today? ✨`,
             isUser: false,
-            timestamp: new Date()
+            timestamp: new Date(),
+            aiPersonality: selectedPersonality,
+            messageType: 'text'
           });
         } else {
           snapshot.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
@@ -183,13 +235,17 @@ function App() {
               text: data.text,
               isUser: data.isUser,
               timestamp: data.timestamp?.toDate() || new Date(),
-              reactions: data.reactions || []
+              reactions: data.reactions || [],
+              aiPersonality: data.aiPersonality || 'assistant',
+              messageType: data.messageType || 'text',
+              mood: data.mood
             });
           });
         }
         
         setMessages(loadedMessages);
         setMessageCounter(counter);
+        setMessageCount(loadedMessages.length);
         setIsConnected(true);
         setError('');
       },
@@ -204,14 +260,17 @@ function App() {
   };
 
   // Function to save message to Firebase
-  const saveMessageToFirebase = async (text: string, isUser: boolean): Promise<void> => {
+  const saveMessageToFirebase = async (text: string, isUser: boolean, messageType: string = 'text'): Promise<void> => {
     try {
-      const messagesRef = collection(db, 'chats', 'default-chat', 'messages');
+      const messagesRef = collection(db, 'chats', activeChatRoom, 'messages');
       await addDoc(messagesRef, {
         text: text,
         isUser: isUser,
         timestamp: Timestamp.fromDate(new Date()),
-        reactions: []
+        reactions: [],
+        aiPersonality: isUser ? null : selectedPersonality,
+        messageType: messageType,
+        mood: isUser ? userMood : null
       });
       console.log('✅ Message saved to Firebase');
       setError('');
@@ -221,8 +280,8 @@ function App() {
     }
   };
 
-  // Play sound effect
-  const playSound = (type: 'send' | 'receive' | 'notification') => {
+  // Play advanced sound effect
+  const playSound = (type: 'send' | 'receive' | 'notification' | 'error' | 'success') => {
     if (!soundEnabled) return;
     
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -232,9 +291,16 @@ function App() {
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
     
-    const frequencies = { send: 800, receive: 600, notification: 1000 };
+    const frequencies = { 
+      send: 800, 
+      receive: 600, 
+      notification: 1000,
+      error: 300,
+      success: 1200
+    };
+    
     oscillator.frequency.setValueAtTime(frequencies[type], audioContext.currentTime);
-    oscillator.type = 'sine';
+    oscillator.type = type === 'error' ? 'sawtooth' : 'sine';
     
     gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
@@ -243,8 +309,8 @@ function App() {
     oscillator.stop(audioContext.currentTime + 0.3);
   };
 
-  // Simulate typing effect for AI responses
-  const simulateTyping = async (text: string): Promise<void> => {
+  // Enhanced typing simulation with personality
+  const simulateTyping = async (text: string, personality: string): Promise<void> => {
     if (!showTypingSimulation) {
       await saveMessageToFirebase(text, false);
       return;
@@ -253,20 +319,30 @@ function App() {
     const words = text.split(' ');
     let currentText = '';
     
+    // Add typing indicator with personality
+    setMessages(prev => [...prev, {
+      id: Date.now(),
+      text: `${AI_PERSONALITIES.find(p => p.id === personality)?.name || '🤖'} is thinking...`,
+      isUser: false,
+      timestamp: new Date(),
+      isTyping: true,
+      aiPersonality: personality
+    }]);
+    
     for (let i = 0; i < words.length; i++) {
       currentText += (i > 0 ? ' ' : '') + words[i];
       
-      // Update the last message with current progress
+      // Update the typing message
       setMessages(prev => {
         const newMessages = [...prev];
         const lastMessage = newMessages[newMessages.length - 1];
         if (lastMessage && lastMessage.isTyping) {
-          lastMessage.text = currentText + '|';
+          lastMessage.text = currentText + '█';
         }
         return newMessages;
       });
       
-      await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 100));
+      await new Promise(resolve => setTimeout(resolve, typingSpeed + Math.random() * 50));
     }
     
     // Remove typing indicator and save final message
@@ -274,83 +350,75 @@ function App() {
     await saveMessageToFirebase(text, false);
   };
 
-  // Function to send message
+  // Enhanced message sending with personality
   const sendMessage = async (): Promise<void> => {
-    if (!input.trim()) return; // Don't send empty messages
+    if (!input.trim()) return;
     
-    const currentInput = input; // Store input before clearing
-    setInput(''); // Clear input immediately
-    setIsLoading(true); // Show loading
-    setError(''); // Clear any previous errors
+    const currentInput = input;
+    setInput('');
+    setIsLoading(true);
+    setError('');
 
-    // Play send sound
     playSound('send');
 
-    // Save user message to Firebase
+    // Save user message with current mood
     await saveMessageToFirebase(currentInput, true);
     
     try {
-      // Add typing indicator for AI
-      if (showTypingSimulation) {
-        setMessages(prev => [...prev, {
-          id: Date.now(),
-          text: 'AI is thinking...',
-          isUser: false,
-          timestamp: new Date(),
-          isTyping: true
-        }]);
-      }
-
-      // Send to backend
+      // Send to backend with personality context
       const response = await axios.post('http://localhost:8000/chat', {
-        message: currentInput
+        message: currentInput,
+        personality: selectedPersonality,
+        mood: userMood,
+        chatRoom: activeChatRoom
       }, {
-        timeout: 30000 // 30 second timeout
+        timeout: 30000
       });
       
-      // Play receive sound
       playSound('receive');
       
-      // Simulate typing for AI response
-      await simulateTyping(response.data.response);
+      // Simulate typing for AI response with personality
+      await simulateTyping(response.data.response, selectedPersonality);
       
     } catch (error) {
-      // Remove typing indicator if it exists
       setMessages(prev => prev.filter(msg => !msg.isTyping));
       
-      // Handle error
-      let errorMessage = "⚠️ Sorry, I couldn't connect to the AI service.";
+      let errorMessage = "⚠️ Connection lost! The AI servers might be down.";
       
       if (axios.isAxiosError(error)) {
         if (error.code === 'ECONNREFUSED') {
-          errorMessage = "🔌 Backend server is not running. Please start the server and try again.";
+          errorMessage = "🔌 Backend offline! Please start the server.";
         } else if (error.code === 'ECONNABORTED') {
-          errorMessage = "⏱️ Request timed out. The AI might be busy, please try again.";
+          errorMessage = "⏱️ Request timeout! The AI is overwhelmed.";
         }
       }
       
       await saveMessageToFirebase(errorMessage, false);
       setError(errorMessage);
+      playSound('error');
     }
     
-    setIsLoading(false); // Hide loading
+    setIsLoading(false);
   };
 
-  // Handle Enter key press
+  // Handle key press with advanced features
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
       e.preventDefault();
       sendMessage();
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      setShowTemplates(!showTemplates);
     }
   };
 
-  // Format timestamp for display
+  // Format timestamp
   const formatTime = (date: Date): string => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Show toast notification
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info'): void => {
+  // Enhanced toast system
+  const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info'): void => {
     const newToast: Toast = {
       id: toastCounter,
       message,
@@ -360,28 +428,41 @@ function App() {
     setToasts(prev => [...prev, newToast]);
     setToastCounter(prev => prev + 1);
     
-    playSound('notification');
+    playSound(type === 'success' ? 'success' : type === 'error' ? 'error' : 'notification');
     
-    // Auto remove toast after 3 seconds
     setTimeout(() => {
       setToasts(prev => prev.filter(toast => toast.id !== newToast.id));
-    }, 3000);
+    }, 4000);
   };
 
-  // Remove toast manually
+  // Remove toast
   const removeToast = (id: number): void => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   };
 
-  // Copy message to clipboard
+  // Copy message with enhanced feedback
   const copyMessage = async (text: string): Promise<void> => {
     try {
       await navigator.clipboard.writeText(text);
-      showToast('Message copied to clipboard! 📋', 'success');
+      showToast('Message copied to clipboard! 📋✨', 'success');
     } catch (error) {
-      console.error('Failed to copy message:', error);
-      showToast('Failed to copy message', 'error');
+      showToast('Failed to copy message 😞', 'error');
     }
+  };
+
+  // Add reaction to message
+  const addReaction = async (messageId: number, emoji: string): Promise<void> => {
+    setMessages(prev => prev.map(msg => {
+      if (msg.id === messageId) {
+        const reactions = msg.reactions || [];
+        const newReactions = reactions.includes(emoji) 
+          ? reactions.filter(r => r !== emoji)
+          : [...reactions, emoji];
+        return { ...msg, reactions: newReactions };
+      }
+      return msg;
+    }));
+    showToast(`Reaction ${emoji} added!`, 'success');
   };
 
   // Voice input
@@ -392,13 +473,51 @@ function App() {
     }
   };
 
-  // Export chat
+  // Switch chat room
+  const switchChatRoom = (roomId: string): void => {
+    setActiveChatRoom(roomId);
+    setChatRooms(prev => prev.map(room => ({
+      ...room,
+      isActive: room.id === roomId
+    })));
+    showToast(`Switched to ${roomId.toUpperCase()} room 🚀`, 'info');
+    loadChatHistory();
+  };
+
+  // Handle file upload
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const fileName = file.name;
+      const fileSize = (file.size / 1024).toFixed(2);
+      setInput(`📎 Uploaded: ${fileName} (${fileSize}KB)`);
+      showToast(`File uploaded: ${fileName} 📁`, 'success');
+    }
+  };
+
+  // Use message template
+  const useTemplate = (template: string): void => {
+    setInput(template + ' ');
+    setShowTemplates(false);
+    showToast('Template applied! ✨', 'success');
+  };
+
+  // Export chat with enhanced features
   const exportChat = (): void => {
-    const chatData = messages.map(msg => ({
-      timestamp: msg.timestamp?.toISOString(),
-      sender: msg.isUser ? 'You' : 'AI',
-      message: msg.text
-    }));
+    const chatData = {
+      chatRoom: activeChatRoom,
+      personality: selectedPersonality,
+      exportDate: new Date().toISOString(),
+      messageCount: messages.length,
+      messages: messages.map(msg => ({
+        timestamp: msg.timestamp?.toISOString(),
+        sender: msg.isUser ? 'You' : `AI (${msg.aiPersonality})`,
+        message: msg.text,
+        reactions: msg.reactions,
+        type: msg.messageType,
+        mood: msg.mood
+      }))
+    };
     
     const dataStr = JSON.stringify(chatData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -406,18 +525,18 @@ function App() {
     
     const link = document.createElement('a');
     link.href = url;
-    link.download = `chat-export-${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `${activeChatRoom}-chat-export-${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     
     URL.revokeObjectURL(url);
-    showToast('Chat exported successfully! 📁', 'success');
+    showToast('Chat exported successfully! 📁✨', 'success');
   };
 
-  // Clear all chat messages
+  // Clear chat
   const clearChat = async (): Promise<void> => {
-    if (window.confirm('Are you sure you want to clear all messages? This cannot be undone.')) {
+    if (window.confirm('🗑️ Clear all messages? This action cannot be undone!')) {
       try {
-        const messagesRef = collection(db, 'chats', 'default-chat', 'messages');
+        const messagesRef = collection(db, 'chats', activeChatRoom, 'messages');
         const snapshot = await getDocs(messagesRef);
         
         const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
@@ -425,33 +544,15 @@ function App() {
         
         setMessages([]);
         setMessageCounter(1);
-        showToast('Chat cleared successfully! 🗑️', 'success');
+        setMessageCount(0);
+        showToast('Chat cleared! Fresh start! 🧹✨', 'success');
       } catch (error) {
-        console.error('Error clearing chat:', error);
-        setError('Failed to clear chat. Please try again.');
-        showToast('Failed to clear chat', 'error');
+        showToast('Failed to clear chat 😞', 'error');
       }
     }
   };
 
-  // Toggle theme
-  const toggleTheme = (): void => {
-    setIsDarkMode(!isDarkMode);
-    showToast(`Switched to ${!isDarkMode ? 'dark' : 'light'} mode! ${!isDarkMode ? '🌙' : '☀️'}`, 'info');
-  };
-
-  // Toggle fullscreen
-  const toggleFullscreen = (): void => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  };
-
-  // Search messages
+  // Get filtered messages
   const filteredMessages = messages.filter(message => {
     const matchesSearch = searchQuery === '' || 
       message.text.toLowerCase().includes(searchQuery.toLowerCase());
@@ -463,9 +564,9 @@ function App() {
     return matchesSearch && matchesFilter && !message.isTyping;
   });
 
-  // Get character count info
+  // Character count info
   const getCharacterInfo = () => {
-    const maxLength = 1000;
+    const maxLength = 2000;
     const currentLength = input.length;
     const isNearLimit = currentLength > maxLength * 0.8;
     return { currentLength, maxLength, isNearLimit };
@@ -474,13 +575,24 @@ function App() {
   const characterInfo = getCharacterInfo();
 
   return (
-    <div className={`app-container ${isDarkMode ? 'dark' : 'light'} ${isFullscreen ? 'fullscreen' : ''}`}>
-      {/* Floating particles background */}
+    <div className={`app-container theme-${currentTheme} ${showSidebar ? 'sidebar-open' : ''}`}>
+      {/* Cyberpunk Background Effects */}
       {showParticles && (
-        <div className="particles-container">
-          {[...Array(20)].map((_, i) => (
-            <div key={i} className={`particle particle-${i % 4}`}></div>
-          ))}
+        <div className="cyber-background">
+          <div className="grid-overlay"></div>
+          <div className="scan-lines"></div>
+          <div className="floating-code">
+            {[...Array(15)].map((_, i) => (
+              <div key={i} className={`code-fragment fragment-${i % 5}`}>
+                {['01010101', 'LOADING...', 'SYSTEM OK', 'NEURAL NET', 'AI ACTIVE'][i % 5]}
+              </div>
+            ))}
+          </div>
+          <div className="neon-particles">
+            {[...Array(30)].map((_, i) => (
+              <div key={i} className={`neon-particle particle-${i % 6}`}></div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -489,190 +601,258 @@ function App() {
         {toasts.map((toast) => (
           <div 
             key={toast.id} 
-            className={`toast toast-${toast.type}`}
+            className={`toast toast-${toast.type} cyber-toast`}
             onClick={() => removeToast(toast.id)}
           >
             <span className="toast-icon">
-              {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}
+              {toast.type === 'success' ? '✅' : 
+               toast.type === 'error' ? '❌' : 
+               toast.type === 'warning' ? '⚠️' : 'ℹ️'}
             </span>
             <span className="toast-message">{toast.message}</span>
-            <button 
-              className="toast-close"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeToast(toast.id);
-              }}
-            >
-              ✕
-            </button>
+            <button className="toast-close" onClick={(e) => {
+              e.stopPropagation();
+              removeToast(toast.id);
+            }}>×</button>
           </div>
         ))}
       </div>
 
-      {/* Header */}
-      <div className="header">
-        <div className="header-content">
-          <div className="header-left">
-            <div className="ai-avatar-header">
-              <div className="avatar-glow"></div>
-              🤖
-            </div>
-            <div className="header-text">
-              <h1>
-                <span className="gradient-text">AI Chatbot Pro</span>
-                <div className="sparkle sparkle-1">✨</div>
-                <div className="sparkle sparkle-2">⭐</div>
-              </h1>
-              <p className="header-subtitle">
-                <span className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}></span>
-                Powered by Gemini Pro + Firebase
-                <span className="pulse-dot"></span>
-              </p>
-            </div>
-          </div>
-          <div className="header-actions">
-            <button 
-              className={`header-btn ${showSearch ? 'active' : ''}`}
-              onClick={() => setShowSearch(!showSearch)}
-              title="Search Messages"
-              aria-label="Search messages"
-            >
-              🔍
-            </button>
-            <button 
-              className="header-btn"
-              onClick={exportChat}
-              title="Export Chat"
-              aria-label="Export chat history"
-            >
-              📁
-            </button>
-            <button 
-              className="header-btn"
-              onClick={toggleFullscreen}
-              title="Toggle Fullscreen"
-              aria-label="Toggle fullscreen mode"
-            >
-              {isFullscreen ? '🗗' : '⛶'}
-            </button>
-            <button 
-              className="header-btn"
-              onClick={clearChat}
-              title="Clear Chat"
-              aria-label="Clear all messages"
-            >
-              🗑️
-            </button>
-            <button 
-              className={`header-btn ${showSettings ? 'active' : ''}`}
-              onClick={() => setShowSettings(!showSettings)}
-              title="Settings"
-              aria-label="Open settings"
-            >
-              ⚙️
-            </button>
-            <button 
-              className="header-btn theme-toggle"
-              onClick={toggleTheme}
-              title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              aria-label="Toggle theme"
-            >
-              {isDarkMode ? '☀️' : '🌙'}
-            </button>
+      {/* Sidebar */}
+      <div className={`sidebar ${showSidebar ? 'sidebar-visible' : ''}`}>
+        <div className="sidebar-header">
+          <h3>🚀 Control Center</h3>
+          <button className="close-sidebar" onClick={() => setShowSidebar(false)}>×</button>
+        </div>
+        
+        {/* AI Personality Selector */}
+        <div className="sidebar-section">
+          <h4>🎭 AI Personality</h4>
+          <div className="personality-grid">
+            {AI_PERSONALITIES.map(personality => (
+              <button
+                key={personality.id}
+                className={`personality-btn ${selectedPersonality === personality.id ? 'active' : ''}`}
+                onClick={() => {
+                  setSelectedPersonality(personality.id);
+                  showToast(`Switched to ${personality.name}! 🎭`, 'success');
+                }}
+              >
+                <span className="personality-emoji">{personality.name.split(' ')[0]}</span>
+                <span className="personality-name">{personality.name.split(' ')[1]}</span>
+                <span className="personality-desc">{personality.description}</span>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Search Bar */}
-        {showSearch && (
-          <div className="search-container">
-            <div className="search-wrapper">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search messages..."
-                className="search-input"
-              />
-              <select
-                value={messageFilter}
-                onChange={(e) => setMessageFilter(e.target.value as 'all' | 'user' | 'ai')}
-                className="filter-select"
+        {/* Chat Rooms */}
+        <div className="sidebar-section">
+          <h4>🏠 Chat Rooms</h4>
+          <div className="chat-rooms">
+            {chatRooms.map(room => (
+              <button
+                key={room.id}
+                className={`room-btn ${room.isActive ? 'active' : ''}`}
+                onClick={() => switchChatRoom(room.id)}
               >
-                <option value="all">All Messages</option>
-                <option value="user">Your Messages</option>
-                <option value="ai">AI Messages</option>
-              </select>
-            </div>
+                <div className="room-info">
+                  <span className="room-name">{room.name}</span>
+                  <span className="room-desc">{room.description}</span>
+                </div>
+                <div className="room-participants">👥 {room.participants}</div>
+              </button>
+            ))}
           </div>
-        )}
+        </div>
 
-        {/* Settings Panel */}
-        {showSettings && (
-          <div className="settings-panel">
-            <div className="settings-grid">
-              <label className="setting-item">
-                <input
-                  type="checkbox"
-                  checked={showParticles}
-                  onChange={(e) => setShowParticles(e.target.checked)}
-                />
-                <span>Floating Particles ✨</span>
-              </label>
-              <label className="setting-item">
-                <input
-                  type="checkbox"
-                  checked={autoScroll}
-                  onChange={(e) => setAutoScroll(e.target.checked)}
-                />
-                <span>Auto Scroll 📜</span>
-              </label>
-              <label className="setting-item">
-                <input
-                  type="checkbox"
-                  checked={showTypingSimulation}
-                  onChange={(e) => setShowTypingSimulation(e.target.checked)}
-                />
-                <span>Typing Animation ⌨️</span>
-              </label>
-              <label className="setting-item">
-                <input
-                  type="checkbox"
-                  checked={soundEnabled}
-                  onChange={(e) => setSoundEnabled(e.target.checked)}
-                />
-                <span>Sound Effects 🔊</span>
-              </label>
+        {/* Theme Selector */}
+        <div className="sidebar-section">
+          <h4>🌈 Visual Themes</h4>
+          <div className="theme-grid">
+            {['cyber', 'neon', 'matrix', 'hologram'].map(theme => (
+              <button
+                key={theme}
+                className={`theme-btn theme-${theme} ${currentTheme === theme ? 'active' : ''}`}
+                onClick={() => {
+                  setCurrentTheme(theme as any);
+                  showToast(`${theme.toUpperCase()} theme activated! 🎨`, 'success');
+                }}
+              >
+                {theme.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Settings */}
+        <div className="sidebar-section">
+          <h4>⚙️ Settings</h4>
+          <div className="settings-list">
+            <label className="setting-toggle">
+              <input
+                type="checkbox"
+                checked={showParticles}
+                onChange={(e) => setShowParticles(e.target.checked)}
+              />
+              <span>✨ Visual Effects</span>
+            </label>
+            <label className="setting-toggle">
+              <input
+                type="checkbox"
+                checked={soundEnabled}
+                onChange={(e) => setSoundEnabled(e.target.checked)}
+              />
+              <span>🔊 Sound Effects</span>
+            </label>
+            <label className="setting-toggle">
+              <input
+                type="checkbox"
+                checked={showTypingSimulation}
+                onChange={(e) => setShowTypingSimulation(e.target.checked)}
+              />
+              <span>⌨️ Typing Animation</span>
+            </label>
+            <div className="setting-slider">
+              <label>⚡ Typing Speed</label>
+              <input
+                type="range"
+                min="10"
+                max="200"
+                value={typingSpeed}
+                onChange={(e) => setTypingSpeed(Number(e.target.value))}
+              />
             </div>
           </div>
-        )}
+        </div>
       </div>
+
+      {/* Main Header */}
+      <div className="cyber-header">
+        <div className="header-left">
+          <button className="sidebar-toggle" onClick={() => setShowSidebar(!showSidebar)}>
+            ☰
+          </button>
+          <div className="ai-status">
+            <div className="ai-avatar-main">
+              <div className="avatar-core">🤖</div>
+              <div className="avatar-ring"></div>
+              <div className="avatar-pulse"></div>
+            </div>
+            <div className="ai-info">
+              <h1 className="cyber-title">CYBER CHAT AI</h1>
+              <div className="status-bar">
+                <span className={`connection-status ${isConnected ? 'online' : 'offline'}`}>
+                  {isConnected ? '🟢 ONLINE' : '🔴 OFFLINE'}
+                </span>
+                <span className="room-indicator">📍 {activeChatRoom.toUpperCase()}</span>
+                <span className="message-counter">💬 {messageCount}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="header-actions">
+          <button 
+            className={`action-btn ${showSearch ? 'active' : ''}`}
+            onClick={() => setShowSearch(!showSearch)}
+            title="Search Messages"
+          >
+            🔍
+          </button>
+          <button 
+            className="action-btn"
+            onClick={exportChat}
+            title="Export Chat"
+          >
+            📁
+          </button>
+          <button 
+            className="action-btn"
+            onClick={clearChat}
+            title="Clear Chat"
+          >
+            🗑️
+          </button>
+          <div className="mood-selector">
+            <span>😊</span>
+            <select value={userMood} onChange={(e) => setUserMood(e.target.value)}>
+              <option value="😊">Happy</option>
+              <option value="😔">Sad</option>
+              <option value="😎">Cool</option>
+              <option value="🤔">Thinking</option>
+              <option value="😴">Sleepy</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      {showSearch && (
+        <div className="search-panel">
+          <div className="search-wrapper">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="🔍 Search through messages..."
+              className="search-input"
+            />
+            <select
+              value={messageFilter}
+              onChange={(e) => setMessageFilter(e.target.value as any)}
+              className="filter-select"
+            >
+              <option value="all">All Messages</option>
+              <option value="user">Your Messages</option>
+              <option value="ai">AI Messages</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (
         <div className="error-banner">
           <span>⚠️ {error}</span>
-          <button onClick={() => setError('')} className="error-close">✕</button>
+          <button onClick={() => setError('')} className="error-close">×</button>
         </div>
       )}
 
-      {/* Chat Container */}
+      {/* Main Chat Area */}
       <div className="chat-wrapper">
-        <div className="chat-container" ref={chatContainerRef}>
+        <div className="chat-container cyber-chat" ref={chatContainerRef}>
           {filteredMessages.map((message) => (
             <div 
               key={message.id} 
               className={`message-row ${message.isUser ? 'user-row' : 'ai-row'}`}
             >
-              {/* AI Avatar (left side) */}
+              {/* AI Avatar */}
               {!message.isUser && (
-                <div className="avatar ai-avatar">
-                  <div className="avatar-glow"></div>
-                  🤖
+                <div className="message-avatar ai-avatar">
+                  <div className="avatar-container">
+                    <span className="avatar-emoji">
+                      {AI_PERSONALITIES.find(p => p.id === message.aiPersonality)?.name.split(' ')[0] || '🤖'}
+                    </span>
+                    <div className="avatar-glow-ring"></div>
+                  </div>
                 </div>
               )}
               
               {/* Message Bubble */}
               <div className={`message-bubble ${message.isUser ? 'user-message' : 'ai-message'} ${message.isTyping ? 'typing' : ''}`}>
+                <div className="message-header">
+                  {!message.isUser && (
+                    <span className="ai-personality">
+                      {AI_PERSONALITIES.find(p => p.id === message.aiPersonality)?.name || 'AI Assistant'}
+                    </span>
+                  )}
+                  {message.isUser && message.mood && (
+                    <span className="user-mood">{message.mood}</span>
+                  )}
+                  <span className="message-time">{message.timestamp && formatTime(message.timestamp)}</span>
+                </div>
+                
                 <div className="message-content">
                   <div className="message-text">
                     {message.isTyping ? (
@@ -681,34 +861,48 @@ function App() {
                       message.text
                     )}
                   </div>
-                  <div className="message-meta">
-                    {message.timestamp && (
-                      <span className="message-time">
-                        {formatTime(message.timestamp)}
-                      </span>
-                    )}
-                    {!message.isTyping && (
-                      <div className="message-actions">
-                        <button
-                          className="action-btn"
-                          onClick={() => copyMessage(message.text)}
-                          title="Copy message"
-                          aria-label="Copy message"
-                        >
-                          📋
-                        </button>
+                  
+                  {!message.isTyping && (
+                    <div className="message-actions">
+                      <button
+                        className="action-btn-small"
+                        onClick={() => copyMessage(message.text)}
+                        title="Copy"
+                      >
+                        📋
+                      </button>
+                      <div className="reactions-container">
+                        {QUICK_REACTIONS.map(emoji => (
+                          <button
+                            key={emoji}
+                            className="reaction-btn"
+                            onClick={() => addReaction(message.id, emoji)}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
                       </div>
-                    )}
-                  </div>
+                      {message.reactions && message.reactions.length > 0 && (
+                        <div className="message-reactions">
+                          {message.reactions.map((reaction, idx) => (
+                            <span key={idx} className="reaction">{reaction}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {!message.isTyping && <div className="message-shine"></div>}
+                
+                <div className="message-glow"></div>
               </div>
 
-              {/* User Avatar (right side) */}
+              {/* User Avatar */}
               {message.isUser && (
-                <div className="avatar user-avatar">
-                  <div className="avatar-glow"></div>
-                  👤
+                <div className="message-avatar user-avatar">
+                  <div className="avatar-container">
+                    <span className="avatar-emoji">👤</span>
+                    <div className="avatar-glow-ring"></div>
+                  </div>
                 </div>
               )}
             </div>
@@ -717,96 +911,143 @@ function App() {
           {/* Loading Animation */}
           {isLoading && !showTypingSimulation && (
             <div className="message-row ai-row">
-              <div className="avatar ai-avatar">
-                <div className="avatar-glow"></div>
-                🤖
+              <div className="message-avatar ai-avatar">
+                <div className="avatar-container">
+                  <span className="avatar-emoji">🤖</span>
+                  <div className="avatar-glow-ring loading"></div>
+                </div>
               </div>
               <div className="message-bubble ai-message loading-message">
-                <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
+                <div className="cyber-loading">
+                  <div className="loading-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  <div className="loading-text">AI PROCESSING...</div>
                 </div>
-                <div className="message-text">AI is thinking...</div>
               </div>
             </div>
           )}
           
-          {/* Auto-scroll target */}
           <div ref={messagesEndRef} />
         </div>
       </div>
 
+      {/* Message Templates */}
+      {showTemplates && (
+        <div className="templates-panel">
+          <div className="templates-header">
+            <h4>💡 Quick Templates</h4>
+            <button onClick={() => setShowTemplates(false)}>×</button>
+          </div>
+          <div className="templates-grid">
+            {MESSAGE_TEMPLATES.map((template, idx) => (
+              <button
+                key={idx}
+                className="template-btn"
+                onClick={() => useTemplate(template)}
+              >
+                {template}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Input Area */}
-      <div className="input-container">
-        <div className="input-wrapper">
-          <div className="input-field-container">
-            <div className="input-glow"></div>
+      <div className="cyber-input-container">
+        <div className="input-panel">
+          <div className="input-tools">
+            <button 
+              className={`tool-btn ${showTemplates ? 'active' : ''}`}
+              onClick={() => setShowTemplates(!showTemplates)}
+              title="Message Templates"
+            >
+              💡
+            </button>
+            <button 
+              className="tool-btn"
+              onClick={() => fileInputRef.current?.click()}
+              title="Upload File"
+            >
+              📎
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              hidden
+              onChange={handleFileUpload}
+              accept="*/*"
+            />
+            {recognition && (
+              <button
+                className={`tool-btn voice-btn ${isRecording ? 'recording' : ''}`}
+                onClick={startVoiceInput}
+                disabled={isLoading || isRecording}
+                title="Voice Input"
+              >
+                {isRecording ? '🎙️' : '🎤'}
+              </button>
+            )}
+          </div>
+
+          <div className="input-field-wrapper">
+            <div className="input-glow-effect"></div>
             <textarea
               value={input}
-              onChange={(e) => setInput(e.target.value.slice(0, 1000))}
+              onChange={(e) => setInput(e.target.value.slice(0, 2000))}
               onKeyPress={handleKeyPress}
-              placeholder="Type your message here... ✨"
+              placeholder="Enter your message... Press Tab for templates ✨"
               disabled={isLoading}
-              className="chat-input"
-              autoFocus
-              maxLength={1000}
+              className="cyber-input"
+              maxLength={2000}
               rows={1}
               style={{
                 resize: 'none',
                 overflow: 'hidden',
-                minHeight: '52px',
-                maxHeight: '120px'
+                minHeight: '60px',
+                maxHeight: '150px'
               }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
-                target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+                target.style.height = Math.min(target.scrollHeight, 150) + 'px';
               }}
             />
+            
             {characterInfo.currentLength > 0 && (
               <div className={`character-count ${characterInfo.isNearLimit ? 'near-limit' : ''}`}>
                 {characterInfo.currentLength}/{characterInfo.maxLength}
               </div>
             )}
           </div>
-          
-          {/* Voice Input Button */}
-          {recognition && (
-            <button
-              className={`voice-button ${isRecording ? 'recording' : ''}`}
-              onClick={startVoiceInput}
-              disabled={isLoading || isRecording}
-              title="Voice Input"
-              aria-label="Start voice input"
-            >
-              {isRecording ? '🎙️' : '🎤'}
-              {isRecording && <div className="recording-pulse"></div>}
-            </button>
-          )}
-          
+
           <button 
             onClick={sendMessage} 
             disabled={!input.trim() || isLoading}
-            className="send-button"
-            aria-label="Send message"
-            title="Send message (Enter)"
+            className="cyber-send-btn"
+            title="Send Message"
           >
             {isLoading ? (
-              <div className="loading-spinner"></div>
+              <div className="cyber-spinner"></div>
             ) : (
               <>
-                <span className="send-icon">➤</span>
-                <div className="button-glow"></div>
+                <span className="send-icon">🚀</span>
+                <div className="send-glow"></div>
               </>
             )}
           </button>
         </div>
+
         <div className="input-footer">
-          <span className="input-hint">
-            Press Enter to send • Shift+Enter for new line • Max 1000 characters
-            {recognition && ' • Click 🎤 for voice input'}
-          </span>
+          <div className="status-indicators">
+            <span className="typing-indicator">⌨️ Press Tab for templates</span>
+            <span className="personality-indicator">
+              🎭 {AI_PERSONALITIES.find(p => p.id === selectedPersonality)?.name}
+            </span>
+            <span className="room-indicator">📍 {activeChatRoom.toUpperCase()}</span>
+          </div>
         </div>
       </div>
     </div>
