@@ -1,0 +1,21 @@
+[debug] [2025-07-23T04:51:38.896Z] ----------------------------------------------------------------------
+[debug] [2025-07-23T04:51:38.899Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Admin\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init
+[debug] [2025-07-23T04:51:38.899Z] CLI Version:   14.11.1
+[debug] [2025-07-23T04:51:38.899Z] Platform:      win32
+[debug] [2025-07-23T04:51:38.899Z] Node Version:  v22.16.0
+[debug] [2025-07-23T04:51:38.899Z] Time:          Wed Jul 23 2025 10:21:38 GMT+0530 (India Standard Time)
+[debug] [2025-07-23T04:51:38.899Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-07-23T04:51:38.904Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-07-23T04:51:38.905Z] > authorizing via signed-in user (www.thanush20044@gmail.com)
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  E:\aicahtbot\my-react-chatbot
+
