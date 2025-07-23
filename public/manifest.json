@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "AI Chatbot",
+  "name": "AI Chatbot - Powered by Gemini Pro",
+  "description": "Intelligent conversational AI assistant powered by Gemini Pro and Firebase",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,6 +21,10 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "portrait-primary",
+  "theme_color": "#667eea",
+  "background_color": "#667eea",
+  "categories": ["productivity", "utilities", "communication"],
+  "lang": "en",
+  "dir": "ltr"
 }
